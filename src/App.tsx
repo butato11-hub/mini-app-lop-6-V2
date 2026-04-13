@@ -131,7 +131,20 @@ export default function App() {
     }
   };
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      setMarkdownInput(content);
+    };
+    reader.readAsText(file);
+  };
+
   const saveToFirebase = async (subject: Subject, content: string, questions: Question[]) => {
+    setIsLoading(true);
     try {
       await setDoc(doc(db, 'study_materials', subject), {
         subject,
@@ -143,8 +156,26 @@ export default function App() {
         questions,
         updatedAt: serverTimestamp()
       });
+      return true;
     } catch (err) {
       console.error("Lỗi khi lưu vào Firebase:", err);
+      setError("Không thể lưu vào CSDL. Vui lòng kiểm tra quyền truy cập.");
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleManualSave = async () => {
+    if (!user) {
+      setError("Vui lòng đăng nhập để lưu vào CSDL.");
+      return;
+    }
+    if (state.selectedSubject && state.studyContent && state.quizData) {
+      const success = await saveToFirebase(state.selectedSubject, state.studyContent.content, state.quizData.questions);
+      if (success) {
+        alert("Đã cập nhật CSDL thành công!");
+      }
     }
   };
 
@@ -291,12 +322,19 @@ export default function App() {
                     placeholder="Ví dụ: Lịch sử là gì? Lịch sử là những gì đã xảy ra trong quá khứ..."
                     className="w-full h-64 p-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all resize-none font-mono text-sm"
                   />
-                  <button
-                    onClick={() => setMarkdownInput(`# Đề cương ôn tập Lịch sử 6\n\n## 1. Lịch sử là gì?\nLịch sử là những gì đã xảy ra trong quá khứ. Môn Lịch sử là môn học tìm hiểu về cội nguồn dòng họ, tổ tiên, dân tộc và lịch sử loài người.\n\n## 2. Tại sao phải học lịch sử?\nHọc lịch sử để biết được cội nguồn, truyền thống quý báu của dân tộc. Giúp chúng ta hiểu được quá trình lao động, đấu tranh để xây dựng đất nước.\n\n## 3. Các nguồn tư liệu lịch sử\n- Tư liệu truyền miệng: Những câu chuyện kể, lời ca, tiếng hát...\n- Tư liệu hiện vật: Những di tích, đồ vật cũ...\n- Tư liệu chữ viết: Sách vở, văn bản cổ...`)}
-                    className="absolute top-4 right-4 text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-bold hover:bg-indigo-200 transition-all"
-                  >
-                    Sử dụng mẫu
-                  </button>
+                  <div className="absolute top-4 right-4 flex gap-2">
+                    <label className="cursor-pointer text-xs bg-white border border-slate-200 text-slate-600 px-3 py-1 rounded-full font-bold hover:bg-slate-50 transition-all flex items-center gap-1 shadow-sm">
+                      <Upload className="w-3 h-3" />
+                      Tải file .md
+                      <input type="file" accept=".md,.txt" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                    <button
+                      onClick={() => setMarkdownInput(`# Đề cương ôn tập Lịch sử 6\n\n## 1. Lịch sử là gì?\nLịch sử là những gì đã xảy ra trong quá khứ. Môn Lịch sử là môn học tìm hiểu về cội nguồn dòng họ, tổ tiên, dân tộc và lịch sử loài người.\n\n## 2. Tại sao phải học lịch sử?\nHọc lịch sử để biết được cội nguồn, truyền thống quý báu của dân tộc. Giúp chúng ta hiểu được quá trình lao động, đấu tranh để xây dựng đất nước.\n\n## 3. Các nguồn tư liệu lịch sử\n- Tư liệu truyền miệng: Những câu chuyện kể, lời ca, tiếng hát...\n- Tư liệu hiện vật: Những di tích, đồ vật cũ...\n- Tư liệu chữ viết: Sách vở, văn bản cổ...`)}
+                      className="text-xs bg-indigo-100 text-indigo-600 px-3 py-1 rounded-full font-bold hover:bg-indigo-200 transition-all"
+                    >
+                      Sử dụng mẫu
+                    </button>
+                  </div>
                   {error && (
                     <div className="absolute -bottom-10 left-0 flex items-center gap-2 text-red-500 text-sm">
                       <AlertCircle className="w-4 h-4" />
@@ -368,6 +406,14 @@ export default function App() {
                   Nội dung ôn tập: {state.selectedSubject}
                 </h3>
                 <div className="flex gap-2">
+                  <button
+                    onClick={handleManualSave}
+                    disabled={isLoading}
+                    className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-100 px-4 py-2 rounded-full font-bold hover:bg-emerald-100 transition-all shadow-sm"
+                  >
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                    Lưu CSDL
+                  </button>
                   <button
                     onClick={() => setState(prev => ({ ...prev, view: 'upload' }))}
                     className="flex items-center gap-2 bg-white border border-slate-200 px-4 py-2 rounded-full font-bold hover:bg-slate-50 transition-all shadow-sm text-slate-600"
