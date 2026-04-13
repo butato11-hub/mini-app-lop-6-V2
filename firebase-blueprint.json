@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "StudyMaterial": {
+      "title": "Study Material",
+      "description": "Nội dung đề cương ôn tập của từng môn học",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "content": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["subject", "content"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Câu hỏi trắc nghiệm",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "correctAnswer": { "type": "integer" },
+        "explanation": { "type": "string" }
+      },
+      "required": ["id", "question", "options", "correctAnswer"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Bộ câu hỏi trắc nghiệm cho một môn học",
+      "type": "object",
+      "properties": {
+        "subject": { "type": "string" },
+        "questions": { "type": "array", "items": { "$ref": "Question" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["subject", "questions"]
+    }
+  },
+  "firestore": {
+    "/study_materials/{subject}": {
+      "schema": "StudyMaterial",
+      "description": "Lưu trữ đề cương theo môn học"
+    },
+    "/quizzes/{subject}": {
+      "schema": "Quiz",
+      "description": "Lưu trữ bộ câu hỏi theo môn học"
+    }
+  }
+}

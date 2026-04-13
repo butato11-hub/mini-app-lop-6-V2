@@ -1,0 +1,55 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: study_materials
+// Document ID: {subject} (e.g., 'Lịch sử', 'Địa lý')
+// Fields:
+//   - subject: string (required)
+//   - content: string (required)
+//   - updatedAt: timestamp (required)
+//
+// Collection: quizzes
+// Document ID: {subject}
+// Fields:
+//   - subject: string (required)
+//   - questions: list of objects (required)
+//     - id: string
+//     - question: string
+//     - options: list of strings (4 items)
+//     - correctAnswer: number (0-3)
+//     - explanation: string (optional)
+//   - updatedAt: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isValidStudyMaterial(data) {
+      return data.subject is string && data.subject.size() > 0 &&
+             data.content is string && data.content.size() > 0;
+    }
+
+    function isValidQuiz(data) {
+      return data.subject is string && data.questions is list;
+    }
+
+    // Rules
+    match /study_materials/{subject} {
+      allow read: if true; // Allow students to read materials
+      allow write: if isAuthenticated(); // Only logged in users can update materials
+    }
+
+    match /quizzes/{subject} {
+      allow read: if true; // Allow students to take quizzes
+      allow write: if isAuthenticated(); // Only logged in users can update quizzes
+    }
+  }
+}
