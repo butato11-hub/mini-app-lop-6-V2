@@ -22,7 +22,16 @@ import {
   LogIn,
   LogOut,
   Save,
-  Database
+  Database,
+  User as UserIcon,
+  Smile,
+  Star,
+  Heart,
+  Zap,
+  Moon,
+  Sun,
+  Coffee,
+  Music
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
@@ -41,14 +50,42 @@ const SUBJECTS: { name: Subject; icon: React.ReactNode; color: string }[] = [
   { name: 'Tin học', icon: <Cpu className="w-6 h-6" />, color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
 ];
 
+const FUN_ICONS = [
+  { id: 'smile', icon: <Smile className="w-6 h-6" /> },
+  { id: 'star', icon: <Star className="w-6 h-6" /> },
+  { id: 'heart', icon: <Heart className="w-6 h-6" /> },
+  { id: 'zap', icon: <Zap className="w-6 h-6" /> },
+  { id: 'moon', icon: <Moon className="w-6 h-6" /> },
+  { id: 'sun', icon: <Sun className="w-6 h-6" /> },
+  { id: 'coffee', icon: <Coffee className="w-6 h-6" /> },
+  { id: 'music', icon: <Music className="w-6 h-6" /> },
+];
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [state, setState] = useState<AppState>({
-    view: 'home',
-    currentQuestionIndex: 0,
-    userAnswers: [],
-    score: 0,
+  const [state, setState] = useState<AppState>(() => {
+    const saved = localStorage.getItem('hoc-tot-user');
+    if (saved) {
+      const { name, icon } = JSON.parse(saved);
+      return {
+        view: 'home',
+        userName: name,
+        userIcon: icon,
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        score: 0,
+      };
+    }
+    return {
+      view: 'welcome',
+      currentQuestionIndex: 0,
+      userAnswers: [],
+      score: 0,
+    };
   });
+
+  const [tempName, setTempName] = useState('');
+  const [tempIcon, setTempIcon] = useState('smile');
 
   const [markdownInput, setMarkdownInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -195,15 +232,27 @@ export default function App() {
   };
 
   const resetApp = () => {
-    setState({
+    setState(prev => ({
+      ...prev,
       view: 'home',
       currentQuestionIndex: 0,
       userAnswers: [],
       score: 0,
-    });
+    }));
     setMarkdownInput('');
     setError(null);
     setQuestionCount(10);
+  };
+
+  const handleWelcomeSubmit = () => {
+    if (!tempName.trim()) {
+      setError('Vui lòng nhập tên của bạn');
+      return;
+    }
+    const newState = { ...state, view: 'home' as const, userName: tempName, userIcon: tempIcon };
+    setState(newState);
+    localStorage.setItem('hoc-tot-user', JSON.stringify({ name: tempName, icon: tempIcon }));
+    setError(null);
   };
 
   const startQuiz = () => {
@@ -223,6 +272,12 @@ export default function App() {
           </div>
           
           <div className="flex items-center gap-2">
+            {state.userName && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-slate-100 rounded-full text-sm font-bold text-slate-600">
+                {FUN_ICONS.find(i => i.id === state.userIcon)?.icon}
+                <span>{state.userName}</span>
+              </div>
+            )}
             {user ? (
               <div className="flex items-center gap-3">
                 <img src={user.photoURL || ''} alt={user.displayName || ''} className="w-8 h-8 rounded-full border border-slate-200" referrerPolicy="no-referrer" />
@@ -250,6 +305,74 @@ export default function App() {
 
       <main className="max-w-4xl mx-auto px-4 py-8">
         <AnimatePresence mode="wait">
+          {state.view === 'welcome' && (
+            <motion.div
+              key="welcome"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="max-w-md mx-auto"
+            >
+              <div className="bg-white p-8 rounded-[40px] shadow-2xl border border-slate-100 space-y-8 text-center">
+                <div className="space-y-2">
+                  <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center mx-auto text-white shadow-xl shadow-indigo-200 mb-4">
+                    <GraduationCap className="w-12 h-12" />
+                  </div>
+                  <h2 className="text-3xl font-black text-slate-900">Chào mừng bạn!</h2>
+                  <p className="text-slate-500">Hãy cho mình biết tên và chọn một biểu tượng vui vẻ nhé.</p>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2 text-left">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">Tên của bạn</label>
+                    <input
+                      type="text"
+                      value={tempName}
+                      onChange={(e) => setTempName(e.target.value)}
+                      placeholder="Nhập tên..."
+                      className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all outline-none font-bold text-lg"
+                    />
+                  </div>
+
+                  <div className="space-y-3 text-left">
+                    <label className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-2">Chọn biểu tượng</label>
+                    <div className="grid grid-cols-4 gap-3">
+                      {FUN_ICONS.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => setTempIcon(item.id)}
+                          className={cn(
+                            "p-4 rounded-2xl border-2 transition-all flex items-center justify-center",
+                            tempIcon === item.id 
+                              ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100" 
+                              : "bg-slate-50 border-slate-50 text-slate-400 hover:border-slate-200"
+                          )}
+                        >
+                          {item.icon}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {error && (
+                    <p className="text-red-500 text-sm font-bold flex items-center justify-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {error}
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handleWelcomeSubmit}
+                    className="w-full py-5 bg-indigo-600 hover:bg-indigo-700 text-white font-black rounded-3xl shadow-xl shadow-indigo-200 transition-all flex items-center justify-center gap-2 text-lg"
+                  >
+                    Bắt đầu ngay
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {state.view === 'home' && (
             <motion.div
               key="home"
@@ -259,8 +382,12 @@ export default function App() {
               className="space-y-8"
             >
               <div className="text-center space-y-3">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-full text-sm font-bold mb-2">
+                  {FUN_ICONS.find(i => i.id === state.userIcon)?.icon}
+                  Chào mừng {state.userName}!
+                </div>
                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
-                  Chào mừng bạn đến với <span className="text-indigo-600">Học Tốt Lớp 6</span>
+                  Hôm nay bạn muốn học gì?
                 </h2>
                 <p className="text-lg text-slate-600 max-w-2xl mx-auto">
                   Chọn môn học bạn muốn ôn luyện. Tải lên đề cương và chúng tôi sẽ giúp bạn học tập hiệu quả hơn.
@@ -346,7 +473,7 @@ export default function App() {
                 <div className="space-y-3">
                   <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Số lượng câu hỏi trắc nghiệm</label>
                   <div className="flex gap-2">
-                    {[10, 20, 40, 60].map(count => (
+                    {[10, 20, 40, 60, 80].map(count => (
                       <button
                         key={count}
                         onClick={() => setQuestionCount(count)}

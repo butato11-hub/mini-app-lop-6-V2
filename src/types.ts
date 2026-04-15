@@ -19,7 +19,9 @@ export interface StudyContent {
 }
 
 export interface AppState {
-  view: 'home' | 'study' | 'quiz' | 'result' | 'upload';
+  view: 'welcome' | 'home' | 'study' | 'quiz' | 'result' | 'upload';
+  userName?: string;
+  userIcon?: string;
   selectedSubject?: Subject;
   quizData?: QuizData;
   studyContent?: StudyContent;
