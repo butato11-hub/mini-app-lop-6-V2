@@ -31,7 +31,10 @@ import {
   Moon,
   Sun,
   Coffee,
-  Music
+  Music,
+  Trophy,
+  FileCheck,
+  ListChecks
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cn } from './lib/utils';
@@ -40,6 +43,7 @@ import { generateQuizFromMarkdown } from './services/gemini';
 import { auth, db, loginWithGoogle, logout } from './firebase';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { TIN_HOC_FIXED_QUIZ } from './data/fixedQuizzes';
 
 const SUBJECTS: { name: Subject; icon: React.ReactNode; color: string }[] = [
   { name: 'Lịch sử', icon: <History className="w-6 h-6" />, color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -100,6 +104,18 @@ export default function App() {
   }, []);
 
   const handleSubjectSelect = async (subject: Subject) => {
+    if (subject === 'Tin học') {
+      setState(prev => ({
+        ...prev,
+        selectedSubject: subject,
+        view: 'mode_selection',
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        score: 0,
+      }));
+      return;
+    }
+
     setIsLoading(true);
     try {
       // Try to load from Firestore first
@@ -229,6 +245,68 @@ export default function App() {
       
       return { ...prev, userAnswers: newUserAnswers, score: newScore, currentQuestionIndex: prev.currentQuestionIndex + 1 };
     });
+  };
+
+  const handleStartFixedQuiz = async () => {
+    if (state.selectedSubject === 'Tin học') {
+      const fixedQuestions = TIN_HOC_FIXED_QUIZ;
+      const newState: AppState = {
+        ...state,
+        view: 'quiz',
+        quizData: { subject: 'Tin học', questions: fixedQuestions },
+        currentQuestionIndex: 0,
+        userAnswers: [],
+        score: 0,
+      };
+      setState(newState);
+
+      // Save to Firebase for this user if logged in
+      if (user) {
+        try {
+          await setDoc(doc(db, 'quizzes', 'Tin học_DeCuongFixed'), {
+            subject: 'Tin học',
+            title: 'Ôn luyện Đề cương',
+            questions: fixedQuestions,
+            updatedAt: serverTimestamp()
+          });
+        } catch (err) {
+          console.error("Lỗi khi lưu đề cương định sẵn:", err);
+        }
+      }
+    }
+  };
+
+  const handleStartCustomStudy = async () => {
+    if (!state.selectedSubject) return;
+    
+    setIsLoading(true);
+    try {
+      const materialDoc = await getDoc(doc(db, 'study_materials', state.selectedSubject));
+      const quizDoc = await getDoc(doc(db, 'quizzes', state.selectedSubject));
+
+      if (materialDoc.exists()) {
+        const materialData = materialDoc.data();
+        const quizData = quizDoc.exists() ? quizDoc.data() : null;
+
+        setState(prev => ({
+          ...prev,
+          view: 'study',
+          studyContent: { subject: state.selectedSubject!, content: materialData.content },
+          quizData: quizData ? { subject: state.selectedSubject!, questions: quizData.questions } : undefined,
+          currentQuestionIndex: 0,
+          userAnswers: [],
+          score: 0,
+        }));
+        setMarkdownInput(materialData.content);
+      } else {
+        setState(prev => ({ ...prev, view: 'upload' }));
+      }
+    } catch (err) {
+      console.error("Lỗi khi tải dữ liệu:", err);
+      setState(prev => ({ ...prev, view: 'upload' }));
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const resetApp = () => {
@@ -389,13 +467,13 @@ export default function App() {
                 <h2 className="text-3xl font-extrabold text-slate-900 sm:text-4xl">
                   Hôm nay bạn muốn học gì?
                 </h2>
-                <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-                  Chọn môn học bạn muốn ôn luyện. Tải lên đề cương và chúng tôi sẽ giúp bạn học tập hiệu quả hơn.
+                <p className="text-lg text-slate-600 max-w-2xl mx-auto font-medium">
+                  Chọn môn học bạn muốn ôn luyện. Hệ thống sẽ giúp bạn học tập hiệu quả nhất.
                 </p>
                 {!user && (
-                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl inline-flex items-center gap-2 text-amber-700 text-sm">
+                  <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl inline-flex items-center gap-2 text-amber-700 text-sm font-bold">
                     <AlertCircle className="w-4 h-4" />
-                    Đăng nhập để lưu trữ đề cương và câu hỏi vào CSDL.
+                    Đăng nhập để lưu trữ đề cương và điểm số vào CSDL.
                   </div>
                 )}
               </div>
@@ -409,17 +487,80 @@ export default function App() {
                     disabled={isLoading}
                     onClick={() => handleSubjectSelect(subject.name)}
                     className={cn(
-                      "flex flex-col items-center justify-center p-6 rounded-3xl border-2 transition-all shadow-sm hover:shadow-md",
+                      "flex flex-col items-center justify-center p-8 rounded-[32px] border-2 transition-all shadow-sm hover:shadow-xl hover:border-indigo-400 group relative overflow-hidden",
                       subject.color,
                       isLoading && "opacity-50 cursor-not-allowed"
                     )}
                   >
-                    <div className="mb-4 p-3 bg-white/50 rounded-2xl">
-                      {isLoading && state.selectedSubject === subject.name ? <Loader2 className="w-6 h-6 animate-spin" /> : subject.icon}
+                    <div className="mb-4 p-4 bg-white/60 rounded-2xl group-hover:bg-white transition-colors">
+                      {isLoading && state.selectedSubject === subject.name ? <Loader2 className="w-8 h-8 animate-spin" /> : subject.icon}
                     </div>
-                    <span className="font-bold text-lg">{subject.name}</span>
+                    <span className="font-bold text-xl">{subject.name}</span>
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <ChevronRight className="w-5 h-5 opacity-40" />
+                    </div>
                   </motion.button>
                 ))}
+              </div>
+            </motion.div>
+          )}
+
+          {state.view === 'mode_selection' && (
+            <motion.div
+              key="mode_selection"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="max-w-2xl mx-auto space-y-8"
+            >
+              <div className="text-center space-y-3">
+                <button 
+                  onClick={() => setState(prev => ({ ...prev, view: 'home' }))}
+                  className="inline-flex items-center gap-2 text-slate-500 hover:text-indigo-600 font-bold mb-4"
+                >
+                  <ChevronLeft className="w-5 h-5" /> Quay lại
+                </button>
+                <div className="w-20 h-20 bg-indigo-100 text-indigo-600 rounded-[32px] flex items-center justify-center mx-auto mb-4">
+                  <Cpu className="w-10 h-10" />
+                </div>
+                <h2 className="text-4xl font-black text-slate-900">Môn Tin học</h2>
+                <p className="text-slate-500 font-medium">Bạn muốn bắt đầu với nội dung nào?</p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                <motion.button
+                  whileHover={{ y: -5 }}
+                  onClick={handleStartFixedQuiz}
+                  className="p-8 bg-white rounded-[40px] border-2 border-slate-100 hover:border-emerald-400 shadow-xl transition-all text-left space-y-4 group"
+                >
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <ListChecks className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Ôn luyện Đề cương</h3>
+                    <p className="text-slate-500 mt-2">Bộ đề 80 câu hỏi trọng tâm (Định dạng văn bản, Bảng, Tìm kiếm, Thuật toán).</p>
+                  </div>
+                  <div className="pt-4 flex items-center text-emerald-600 font-bold gap-2">
+                    Bắt đầu ngay <ChevronRight className="w-5 h-5" />
+                  </div>
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ y: -5 }}
+                  onClick={handleStartCustomStudy}
+                  className="p-8 bg-white rounded-[40px] border-2 border-slate-100 hover:border-indigo-400 shadow-xl transition-all text-left space-y-4 group"
+                >
+                  <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-3xl flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Tự do học tập</h3>
+                    <p className="text-slate-500 mt-2">Tải đề cương của riêng bạn và để hệ thống giúp bạn ôn luyện linh hoạt.</p>
+                  </div>
+                  <div className="pt-4 flex items-center text-indigo-600 font-bold gap-2">
+                    Khám phá <ChevronRight className="w-5 h-5" />
+                  </div>
+                </motion.button>
               </div>
             </motion.div>
           )}
